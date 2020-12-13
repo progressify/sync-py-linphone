@@ -1,11 +1,13 @@
 import sys
 
 import click
+from tqdm import tqdm
 
 from utils.csv_manager import CsvManager
 from utils.db_manager import DbManager
 from utils.exceptions.csv_exception import CsvException
 from utils.exceptions.database_exception import DatabaseException
+
 
 # TODO init
 
@@ -29,10 +31,14 @@ def sync(csvpath: str, dbpath: str):
         print(e)
         sys.exit(-1)
 
+    print("Reading contacts from csv:")
     csv_manager.parse()
     if csv_manager.array_contacts:
-        for a_contact in csv_manager.array_contacts:
+        print(f'\n-> {len(csv_manager.array_contacts)} contacts parsed!')
+        print("\nSyncing..")
+        for a_contact in tqdm(csv_manager.array_contacts):  # TODO syncing login
             db_manager.insert_contact(a_contact)
+    db_manager.close()
 
 
 if __name__ == '__main__':

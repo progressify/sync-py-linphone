@@ -38,7 +38,12 @@ class DbManager:
 
     def insert_contact(self, a_contact: Contact):  # TODO
         sql = ("INSERT INTO friends"
-               "(id, friend_list_id, sip_uri, subscribe_policy, send_subscribe, ref_key, vCard, "
+               "(friend_list_id, sip_uri, subscribe_policy, send_subscribe, ref_key, vCard, "
                "vCard_etag, vCard_url, presence_received) "
-               "VALUES (null, 1, :sip_uri, 1, 0, null, :vcard, null, null, 0)")
-        self.cursor.execute(sql, {'sip_uri': a_contact.sip_uri, 'vcard': a_contact.create_vcard()})
+               "VALUES (1, ?, 1, 0, NULL, ?, NULL, NULL, 0)")
+        self.cursor.execute(sql, (a_contact.sip_uri, a_contact.create_vcard()))
+        self.connection.commit()
+
+    def close(self):
+        self.cursor.close()
+        self.connection.close()
