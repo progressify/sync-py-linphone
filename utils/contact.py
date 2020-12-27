@@ -1,5 +1,6 @@
 import vobject
 
+from models.friends import Friends
 
 NAME_FIELD = 'Name'
 PHONE_VALUE = 'Phone {number} - Value'
@@ -21,10 +22,11 @@ class Contact:
     def create_vcard(self):
         person = {
             'VERSION': '4.0',
-            'FN': self.name
+            'FN': self.name,
+            'ROLE': self.name
         }
 
-        vcard = vobject.readOne('\n'.join([f'{k}:{v}' for k, v in person.items()]))
+        vcard = vobject.readOne('\n'.join([f'{k}:{person[k]}' for k in person.keys()]))
         vcard.name = 'VCARD'
         for num in self.phones:
             impp = vcard.add('IMPP')
@@ -32,3 +34,6 @@ class Contact:
 
         vcard.useBegin = True
         return vcard.serialize()
+
+    def friends_obj(self):
+        return Friends(sip_uri=self.sip_uri, vCard=self.create_vcard())

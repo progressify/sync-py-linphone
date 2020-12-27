@@ -2,6 +2,9 @@ import sqlite3
 import sys
 from os import path
 
+from syncasync import AsyncToSync
+from tortoise import Tortoise
+
 from utils.contact import Contact
 from utils.exceptions.database_exception import DatabaseException
 
@@ -15,6 +18,7 @@ LINPHONE_WINDOWS_DB_PATH = ''  # TODO
 class DbManager:
 
     def __init__(self, db_path):
+        self.with_tortoise = True
         if db_path:
             self.db_filename = db_path
         elif sys.platform == "linux" or sys.platform == "linux2":
@@ -33,17 +37,37 @@ class DbManager:
         if not path.exists(self.db_filename):
             raise DatabaseException()
 
-        self.connection = sqlite3.connect(self.db_filename)
-        self.cursor = self.connection.cursor()
+        if self.with_tortoise:
+            self.create_tortoise_instance()
+        else:
+            self.connection = sqlite3.connect(self.db_filename)
+            self.cursor = self.connection.cursor()
 
-    def insert_contact(self, a_contact: Contact):  # TODO
-        sql = ("INSERT INTO friends"
-               "(friend_list_id, sip_uri, subscribe_policy, send_subscribe, ref_key, vCard, "
-               "vCard_etag, vCard_url, presence_received) "
-               "VALUES (1, ?, 1, 0, NULL, ?, NULL, NULL, 0)")
-        self.cursor.execute(sql, (a_contact.sip_uri, a_contact.create_vcard()))
-        self.connection.commit()
+    @AsyncToSync
+    async def create_tortoise_instance(self):
+        await Tortoise.init(
+            db_url=f'sqlite://{self.db_filename}',
+            modules={'models': ['models.friends']}
+        )
+        await Tortoise.generate_schemas()
 
-    def close(self):
-        self.cursor.close()
-        self.connection.close()
+    @AsyncToSync
+    async def insert_contact(self, a_contact: Contact):  # TODO
+        if self.with_tortoise:
+            friend = a_contact.friends_obj()
+            await friend.save()
+        else:
+            sql = ("INSERT INTO friends"
+                   "(friend_list_id, sip_uri, subscribe_policy, send_subscribe, ref_key, vCard, "
+                   "vCard_etag, vCard_url, presence_received) "
+                   "VALUES (1, ?, 1, 0, NULL, ?, NULL, NULL, 0)")
+            self.cursor.execute(sql, (a_contact.sip_uri, a_contact.create_vcard()))
+            self.connection.commit()
+
+    @AsyncToSync
+    async def close(self):
+        if self.with_tortoise:
+            await Tortoise.close_connections()
+        else:
+            self.cursor.close()
+            self.connection.close()
